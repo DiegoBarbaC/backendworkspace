@@ -10,6 +10,8 @@ from datetime import timedelta
 from bson.json_util import dumps
 #from bson.binary import Binary
 import gridfs
+import base64
+
 
 
 app = Flask(__name__)
@@ -237,6 +239,35 @@ def deleteSection(section_id):
         return jsonify({"msg": "Sección eliminada correctamente"}), 200
     else:
         return jsonify({"msg": "Error al eliminar la sección o no existe"}), 404
+    
+
+@app.route('/sections', methods=['GET'])
+@jwt_required()  # Requiere autenticación
+def getSections():
+    # Verifica si el usuario está autenticado
+    current_user = get_jwt_identity()
+    user = mongo.db.usuarios.find_one({"_id": ObjectId(current_user)})
+    
+    if not user:
+        return jsonify({"msg": "Acceso denegado: usuario no encontrado"}), 403
+
+    # Recupera todas las secciones de la base de datos
+    secciones = mongo.db.secciones.find()  # Obtener todas las secciones
+
+    # Prepara la respuesta
+    result = []
+    for section in secciones:
+        # Convierte la imagen de Binary a Base64 si es necesario
+        if 'imagen' in section:
+            #section['imagen'] = section['imagen'].encode('utf-8')  
+            section['imagen'] = base64.b64encode(section['imagen']).decode('utf-8')
+
+        # También puedes eliminar el campo '_id' si no deseas que se muestre
+        section['_id'] = str(section['_id'])  # Convierte ObjectId a string
+        result.append(section)
+
+    return jsonify(result), 200
+
 
 
 
