@@ -8,7 +8,7 @@ from flask_jwt_extended import get_jwt_identity
 from bson import ObjectId, Binary
 from datetime import timedelta
 from bson.json_util import dumps
-#from bson.binary import Binary
+from flask_cors import CORS
 import gridfs
 import base64
 
@@ -18,7 +18,7 @@ app = Flask(__name__)
 app.config.from_object(config)
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
-
+CORS(app)
 
 
 #Inicializamos el acceso a MongoDB
@@ -45,11 +45,27 @@ def register():
 
     # Crear hash de la contraseña
     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
-    result = mongo.db.usuarios.insert_one({"email":email,"password": hashed_password, "admin":admin, "editar":editar})
+
+    # Obtener todas las secciones globales existentes para asignarlas al nuevo usuario
+    secciones_globales = list(mongo.db.secciones_globales.find())
+    secciones_usuario = [
+        {"seccion_id": seccion['_id'], "orden": idx}
+        for idx, seccion in enumerate(secciones_globales)
+    ]
+
+    result = mongo.db.usuarios.insert_one({
+        "email": email,
+        "password": hashed_password,
+        "admin": admin,
+        "editar": editar,
+        "secciones": secciones_usuario
+    })
+    
     if result.acknowledged:
         return jsonify({"msg": "Usuario Creado Correctamente"}), 201
     else:
-        return jsonify({"msg": "Hubo un error, no se pudieron guardar los datos"}),400
+        return jsonify({"msg": "Hubo un error, no se pudieron guardar los datos"}), 400
+
 @app.route('/login', methods=['POST'])
 def login():
     data= request.get_json()
@@ -69,6 +85,7 @@ def login():
         return jsonify(access_token=access_token),200
     else:
         return jsonify({"msg":"Credenciales incorrectas"}), 401
+    
 @app.route('/deleteUser', methods=['DELETE'])
 @jwt_required()
 def deleteUser():
@@ -130,8 +147,146 @@ def get_all_users():
     
     return jsonify({"usuarios": user_list}), 200
 
+@app.route('/createGlobalSection', methods=['POST'])
+@jwt_required()
+def createGlobalSection():
+    current_user = get_jwt_identity()
+    user = mongo.db.usuarios.find_one({"_id": ObjectId(current_user)})
+    
+    if not user or not (user.get("editar", False) or user.get("admin", False)):
+        return jsonify({"msg": "Acceso denegado: se requiere el permiso de edición"}), 403
 
+    titulo = request.form.get('titulo')
+    descripcion = request.form.get('descripcion')
+    link = request.form.get('link')
+    imagen = request.files.get('imagen')
 
+    if not all([imagen, titulo, descripcion, link]):
+        return jsonify({'message': 'Todos los campos son requeridos'}), 400
+
+    imagen_data = Binary(imagen.read())
+
+    # Crear la sección global
+    nueva_seccion = {
+        "imagen": imagen_data,
+        "titulo": titulo,
+        "descripcion": descripcion,
+        "link": link
+    }
+    
+    result = mongo.db.secciones_globales.insert_one(nueva_seccion)
+    seccion_id = result.inserted_id
+
+    # Agregar la sección a todos los usuarios al final de su lista
+    mongo.db.usuarios.update_many(
+        {},
+        {
+            "$push": {
+                "secciones": {
+                    "seccion_id": seccion_id,
+                    "orden": 999999  # Un número alto para agregarlo al final
+                }
+            }
+        }
+    )
+
+    if result.acknowledged:
+        return jsonify({"msg": "Sección creada y agregada a todos los usuarios"}), 201
+    else:
+        return jsonify({"msg": "Error al crear la sección"}), 400
+
+@app.route('/user/sections', methods=['GET'])
+@jwt_required()
+def getUserSections():
+    current_user = get_jwt_identity()
+    user = mongo.db.usuarios.find_one({"_id": ObjectId(current_user)})
+    
+    if not user:
+        return jsonify({"msg": "Usuario no encontrado"}), 404
+
+    # Obtener las secciones del usuario con su orden
+    user_sections = user.get('secciones', [])
+    
+    # Ordenar por el campo orden
+    user_sections.sort(key=lambda x: x['orden'])
+    
+    # Obtener los detalles completos de cada sección
+    result = []
+    for section_info in user_sections:
+        section = mongo.db.secciones_globales.find_one({"_id": section_info['seccion_id']})
+        if section:
+            section_data = {
+                "_id": str(section['_id']),
+                "titulo": section['titulo'],
+                "descripcion": section['descripcion'],
+                "link": section['link'],
+                "orden": section_info['orden']
+            }
+            if 'imagen' in section:
+                section_data['imagen'] = base64.b64encode(section['imagen']).decode('utf-8')
+            result.append(section_data)
+
+    return jsonify(result), 200
+
+@app.route('/user/sections/order', methods=['PUT'])
+@jwt_required()
+def updateSectionsOrder():
+    current_user = get_jwt_identity()
+    data = request.get_json()
+    
+    if not data or 'sections' not in data:
+        return jsonify({"msg": "Se requiere la lista de secciones con su orden"}), 400
+    
+    # Obtener el usuario y sus secciones actuales
+    user = mongo.db.usuarios.find_one({"_id": ObjectId(current_user)})
+    if not user:
+        return jsonify({"msg": "Usuario no encontrado"}), 404
+        
+    current_sections = user.get('secciones', [])
+    
+    # Crear un diccionario con las secciones actuales para fácil acceso
+    sections_dict = {str(section['seccion_id']): section for section in current_sections}
+    
+    # Actualizar solo el orden de las secciones especificadas
+    for section in data['sections']:
+        section_id = section['seccion_id']
+        if section_id in sections_dict:
+            sections_dict[section_id]['orden'] = section['orden']
+    
+    # Convertir el diccionario actualizado de vuelta a lista
+    updated_sections = [
+        {
+            "seccion_id": ObjectId(section_id) if isinstance(section_id, str) else section_id,
+            "orden": section_data['orden']
+        }
+        for section_id, section_data in sections_dict.items()
+    ]
+    
+    # Actualizar en la base de datos
+    result = mongo.db.usuarios.update_one(
+        {"_id": ObjectId(current_user)},
+        {"$set": {"secciones": updated_sections}}
+    )
+    
+    if result.modified_count == 1:
+        return jsonify({"msg": "Orden actualizado correctamente"}), 200
+    else:
+        return jsonify({"msg": "Error al actualizar el orden"}), 400
+
+@app.route('/user/sections/<section_id>', methods=['DELETE'])
+@jwt_required()
+def removeUserSection(section_id):
+    current_user = get_jwt_identity()
+    
+    result = mongo.db.usuarios.update_one(
+        {"_id": ObjectId(current_user)},
+        {"$pull": {"secciones": {"seccion_id": ObjectId(section_id)}}}
+    )
+    
+    if result.modified_count == 1:
+        return jsonify({"msg": "Sección eliminada de tu dashboard"}), 200
+    else:
+        return jsonify({"msg": "Error al eliminar la sección"}), 404
 
 @app.route('/createSection', methods=['POST'])
 @jwt_required()  # Requiere autenticación
@@ -144,6 +299,7 @@ def createSection():
         return jsonify({"msg": "Acceso denegado: se requiere el permiso de edición"}), 403
 
     # Obtén los datos del formulario
+    orden = request.form.get('orden')
     titulo = request.form.get('titulo')
     descripcion = request.form.get('descripcion')
     link = request.form.get('link')
