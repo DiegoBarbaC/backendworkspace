@@ -13,7 +13,6 @@ import gridfs
 import base64
 
 
-
 app = Flask(__name__)
 app.config.from_object(config)
 bcrypt = Bcrypt(app)
