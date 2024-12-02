@@ -23,14 +23,14 @@ jobs:
       uses: docker/login-action@v2
       with:
         registry: https://contenedorcaa.azurecr.io/
-        username: ${{ secrets.AzureAppService_ContainerUsername_e7ee31ea028640b48baef82f28b6856c }}
-        password: ${{ secrets.AzureAppService_ContainerPassword_07a98f39c9eb45c8a4a5758a3d5f1391 }}
+        username: ${{ secrets.AzureAppService_ContainerUsername_5cf4974796924578994d4f0b03ede9bd }}
+        password: ${{ secrets.AzureAppService_ContainerPassword_f461ed93478941358ae105b86e3d9986 }}
 
     - name: Build and push container image to registry
       uses: docker/build-push-action@v3
       with:
         push: true
-        tags: contenedorcaa.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_e7ee31ea028640b48baef82f28b6856c }}/backend-caa:${{ github.sha }}
+        tags: contenedorcaa.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_5cf4974796924578994d4f0b03ede9bd }}/backend-caa:${{ github.sha }}
         file: ./Dockerfile
 
   deploy:
@@ -47,5 +47,5 @@ jobs:
       with:
         app-name: 'BackendWorkspace'
         slot-name: 'production'
-        publish-profile: ${{ secrets.AzureAppService_PublishProfile_04f56eff80d845638f14974b4e7d9cf2 }}
-        images: 'contenedorcaa.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_e7ee31ea028640b48baef82f28b6856c }}/backend-caa:${{ github.sha }}'
+        publish-profile: ${{ secrets.AzureAppService_PublishProfile_0bd3312047d642b8ae0bd8cb6fb5613d }}
+        images: 'contenedorcaa.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_5cf4974796924578994d4f0b03ede9bd }}/backend-caa:${{ github.sha }}'
