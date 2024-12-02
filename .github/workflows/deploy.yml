@@ -1,49 +1,34 @@
-name: Deploy to Azure Container Apps
-
-on:
-  push:
-    branches:
+trigger:
+  branches:
+    include:
       - main
 
-permissions:
-  id-token: write
-  contents: read
+pool:
+  vmImage: 'ubuntu-latest'
 
-env:
-  AZURE_CONTAINER_REGISTRY: ContenedorWorkspace
-  IMAGE_NAME: backend-caa
+variables:
+  AZURE_CONTAINER_REGISTRY: 'ContenedorWorkspace'
+  IMAGE_NAME: 'backend-caa'
+  DOCKER_REGISTRY: '$(AZURE_CONTAINER_REGISTRY).azurecr.io'
+  TAG: $(Build.BuildId)
 
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
+- job: BuildAndPush
+  displayName: 'Build and Push Docker Image'
+  steps:
 
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: d6fb91f3-2d63-4731-85ab-1a3aa373e3e2
-          tenant-id: 0d8d6b97-e05d-460c-b6b5-19b7d020f47a
-          allow-no-subscriptions: true
-          enable-AzPSSession: true
-          
+    - task: Docker@2
+      displayName: 'Build and push Docker image'
+      inputs:
+        containerRegistry: '$(DOCKER_REGISTRY)'
+        repository: '$(DOCKER_REGISTRY)/$(IMAGE_NAME)'
+        command: 'buildAndPush'
+        Dockerfile: '**/Dockerfile'
+        tags: '$(TAG)'
 
-      - name: Log in to Azure Container Registry
-        uses: azure/docker-login@v1
-        with:
-          login-server: ContenedorWorkspace.azurecr.io
-          username: ContenedorWorkspace
-          password: osbX0e6QFShvozOMo/OlFeCWpwUraz/DgKIuiyypzh+ACRDfxj3E
-
-      - name: Build and push container image
-        run: |
-          docker build -t ContenedorWorkspace.azurecr.io/backend-caa:${{ github.sha }} .
-          docker push ContenedorWorkspace.azurecr.io/backend-caa:${{ github.sha }}
-
-      - name: Deploy to Azure Container Apps
-        uses: azure/container-apps-deploy-action@v1
-        with:
-          containerAppName: backend-caa
-          resourceGroup: Infraestructura
-          imageToDeploy: ContenedorWorkspace.azurecr.io/backend-caa:${{ github.sha }}
+    - task: AzureWebAppContainer@2
+      displayName: 'Deploy to Azure Web App for Containers'
+      inputs:
+        appName: 'your-web-app-name'
+        containerRegistry: '$(DOCKER_REGISTRY)'
+        imageName: '$(DOCKER_REGISTRY)/$(IMAGE_NAME):$(TAG)'
