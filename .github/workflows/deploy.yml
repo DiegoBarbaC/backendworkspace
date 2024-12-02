@@ -25,7 +25,8 @@ jobs:
         with:
           client-id: d6fb91f3-2d63-4731-85ab-1a3aa373e3e2
           tenant-id: 0d8d6b97-e05d-460c-b6b5-19b7d020f47a
-          allow-no-subscriptions: true
+          subscription-id: 419a6d92-1568-4e67-b54f-e0b2ae4818c2
+          
 
       - name: Log in to Azure Container Registry
         uses: azure/docker-login@v1
