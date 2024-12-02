@@ -25,3 +25,4 @@ ENV FLASK_ENV=production
 
 # Comando para ejecutar la aplicación
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "app:app"]
+
