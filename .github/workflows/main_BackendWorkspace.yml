@@ -1,6 +1,3 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-
 name: Build and deploy container app to Azure Web App - BackendWorkspace
 
 on:
@@ -33,18 +30,10 @@ jobs:
         push: true
         tags: contenedorcaa.azurecr.io/backend-caa:${{ github.sha }}
 
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    environment:
-      name: 'production'
-      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
-
-    steps:
     - name: Deploy to Azure Web App
       id: deploy-to-webapp
       uses: azure/webapps-deploy@v2
       with:
         app-name: 'BackendWorkspace'
-        publish-profile: ${{ secrets.AzureAppService_PublishProfile_0bd3312047d642b8ae0bd8cb6fb5613d }}
+        publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
         images: 'contenedorcaa.azurecr.io/backend-caa:${{ github.sha }}'
