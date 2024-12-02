@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 env:
-  AZURE_CONTAINER_REGISTRY: "contenedorworkspace"
+  AZURE_CONTAINER_REGISTRY: "ContenedorWorkspace"
   IMAGE_NAME: "backend-caa"
 
 jobs:
