@@ -11,41 +11,42 @@ on:
 
 jobs:
   build:
-    runs-on: 'ubuntu-latest'
-
-    steps:
-    - uses: actions/checkout@v2
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-
-    - name: Log in to registry
-      uses: docker/login-action@v2
-      with:
-        registry: https://contenedorcaa.azurecr.io/
-        username: ${{ secrets.AzureAppService_ContainerUsername_5cf4974796924578994d4f0b03ede9bd }}
-        password: ${{ secrets.AzureAppService_ContainerPassword_f461ed93478941358ae105b86e3d9986 }}
-
-    - name: Build and push container image to registry
-      uses: docker/build-push-action@v3
-      with:
-        push: true
-        tags: contenedorcaa.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_5cf4974796924578994d4f0b03ede9bd }}/backend-caa:${{ github.sha }}
-        file: ./Dockerfile
-
-  deploy:
     runs-on: ubuntu-latest
-    needs: build
-    environment:
-      name: 'production'
-      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
 
     steps:
-    - name: Deploy to Azure Web App
-      id: deploy-to-webapp
-      uses: azure/webapps-deploy@v2
-      with:
-        app-name: 'BackendWorkspace'
-        slot-name: 'production'
-        publish-profile: ${{ secrets.AzureAppService_PublishProfile_0bd3312047d642b8ae0bd8cb6fb5613d }}
-        images: 'contenedorcaa.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_5cf4974796924578994d4f0b03ede9bd }}/backend-caa:${{ github.sha }}'
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to container registry
+        uses: docker/login-action@v2
+        with:
+          registry: https://contenedorcaa.azurecr.io/
+          username: ${{ secrets.AzureAppService_ContainerUsername_a46369a62d7c4d239f78b8987ec00ed4 }}
+          password: ${{ secrets.AzureAppService_ContainerPassword_ecb24b9f824b4fc4a44bc04af7b7ab4d }}
+
+      - name: Build and push container image to registry
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          push: true
+          tags: contenedorcaa.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_a46369a62d7c4d239f78b8987ec00ed4 }}/backend-caa:${{ github.sha }}
+          file: ./Dockerfile
+
+    deploy:
+      runs-on: ubuntu-latest
+      needs: build
+      environment:
+        name: 'Production'
+        url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+
+      steps:
+        - name: Deploy to Azure Web App
+          id: deploy-to-webapp
+          uses: azure/webapps-deploy@v2
+          with:
+            app-name: 'BackendWorkspace'
+            slot-name: 'Production'
+            publish-profile: ${{ secrets.AzureAppService_PublishProfile_e829ab78447142a4a6b12f1c45ec49a7 }}
+            images: 'contenedorcaa.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_a46369a62d7c4d239f78b8987ec00ed4 }}/backend-caa:${{ github.sha }}'
