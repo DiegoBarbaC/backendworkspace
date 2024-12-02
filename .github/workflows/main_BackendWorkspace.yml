@@ -1,39 +1,29 @@
-name: Build and deploy container app to Azure Web App - BackendWorkspace
+name: Deploy Flask App to Azure
 
-on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
+  on:
+    push:
+      branches:
+        - main  # Ejecutar el workflow en cada push a la rama main
 
-jobs:
-  build:
-    runs-on: 'ubuntu-latest'
+  jobs:
+    build-and-deploy:
+      runs-on: ubuntu-latest
 
-    steps:
-    - uses: actions/checkout@v2
+      steps:
+      # 1. Configurar el repositorio
+      - name: Checkout source code
+        uses: actions/checkout@v3
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+      # 2. Loguearse en Azure Container Registry
+      - name: Login to Azure Container Registry
+        uses: azure/docker-login@v1
+        with:
+          login-server: contenedorcaa.azurecr.io  # Cambia al servidor de tu ACR
+          username: contenedorcaa  # Configura este secreto en GitHub
+          password: ${{ secrets.AZURE_CONTAINER_PASSWORD }}
 
-    - name: Log in to registry
-      uses: docker/login-action@v2
-      with:
-        registry: https://contenedorcaa.azurecr.io/
-        username: contenedorcaa
-        password: ${{ secrets.AZURE_CONTAINER_PASSWORD }}
-
-    - name: Build and push container image to registry
-      uses: docker/build-push-action@v3
-      with:
-        context: .
-        push: true
-        tags: contenedorcaa.azurecr.io/backend-caa:${{ github.sha }}
-
-    - name: Deploy to Azure Web App
-      id: deploy-to-webapp
-      uses: azure/webapps-deploy@v2
-      with:
-        app-name: 'BackendWorkspace'
-        publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
-        images: 'contenedorcaa.azurecr.io/backend-caa:${{ github.sha }}'
+      # 3. Construir y empujar la imagen Docker
+      - name: Build and push Docker image
+        run: |
+          docker build -t contenedorca.azurecr.io/flask-app:latest .
+          docker push contenedorca.azurecr.io/flask-app:latest
