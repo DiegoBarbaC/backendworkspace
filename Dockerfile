@@ -17,7 +17,11 @@ RUN pipenv install --system --deploy
 COPY . .
 
 # Exponer el puerto que usa Flask
-EXPOSE 5000
+EXPOSE 8000
+
+# Establecer las variables de entorno
+ENV FLASK_APP=app.py
+ENV FLASK_ENV=production
 
 # Comando para ejecutar la aplicación
-CMD ["python", "app.py"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "app:app"]
