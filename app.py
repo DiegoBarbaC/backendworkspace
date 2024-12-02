@@ -85,6 +85,10 @@ def login():
     else:
         return jsonify({"msg":"Credenciales incorrectas"}), 401
     
+@app.route('/api1', methods=['GET'])
+def hola():
+    return ("Hola Infra")
+    
 @app.route('/deleteUser', methods=['DELETE'])
 @jwt_required()
 def deleteUser():
