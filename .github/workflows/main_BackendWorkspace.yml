@@ -46,6 +46,6 @@ jobs:
       uses: azure/webapps-deploy@v2
       with:
         app-name: 'BackendWorkspace'
-        slot-name: 'production'
+        slot-name: 'produccion'
         publish-profile: ${{ secrets.AzureAppService_PublishProfile_0bd3312047d642b8ae0bd8cb6fb5613d }}
         images: 'contenedorcaa.azurecr.io/${{ secrets.AzureAppService_ContainerUsername_5cf4974796924578994d4f0b03ede9bd }}/backend-caa:${{ github.sha }}'
