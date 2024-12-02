@@ -27,3 +27,4 @@ ENV FLASK_ENV=production
 #CMD ["gunicorn", "--bind", "0.0.0.0:8000", "app:app"]
 # Comando para ejecutar la aplicación
 CMD ["python", "-m", "flask", "run", "--host=0.0.0.0", "--port=8000"]
+
