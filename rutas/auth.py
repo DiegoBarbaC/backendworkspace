@@ -3,10 +3,20 @@ from flask_jwt_extended import create_access_token, jwt_required
 from model import mongo
 from flask_bcrypt import Bcrypt
 from datetime import timedelta
+from flask_mail import Mail, Message
+import random
+import string
 
 
 auth_bp = Blueprint("auth", __name__,)
 bcrypt=Bcrypt()
+
+def generate_random_password(length=12):
+    # Caracteres para la contraseña
+    characters = string.ascii_letters + string.digits + string.punctuation
+    # Generar contraseña aleatoria
+    password = ''.join(random.choice(characters) for i in range(length))
+    return password
 
 @auth_bp.route("/login", methods=["POST"])
 def login():
@@ -34,21 +44,25 @@ def login():
 @auth_bp.route('/register', methods=['POST'])
 @jwt_required()
 def register():
+    from app import mail  # Importamos mail aquí para evitar importación circular
+    
     data = request.get_json()
 
-    # Verificar que el correo y la contraseña están presentes en la solicitud
+    # Verificar que el correo está presente en la solicitud
     email = data.get('email')
-    password = data.get('password')
-    editar=data.get('editar', False)
-    admin=data.get('admin', False)
+    editar = data.get('editar', False)
+    admin = data.get('admin', False)
 
-    if not email or not password:
-        return jsonify({'message': 'Se requiere email y contraseña para crear el usuario'}), 400
+    if not email:
+        return jsonify({'message': 'Se requiere email para crear el usuario'}), 400
 
     # Verificar si el correo ya está registrado
     if mongo.db.usuarios.find_one({'email': email}):
         return jsonify({'message': 'Este email ya tiene una cuenta creada, debe iniciar sesión'}), 400
 
+    # Generar contraseña aleatoria
+    password = generate_random_password()
+    
     # Crear hash de la contraseña
     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
 
@@ -68,7 +82,25 @@ def register():
     })
     
     if result.acknowledged:
-        return jsonify({"msg": "Usuario Creado Correctamente"}), 201
+        # Enviar correo con la contraseña
+        try:
+            msg = Message(
+                'Bienvenido al Workspace CAA - Tus credenciales de acceso',
+                recipients=[email]
+            )
+            msg.html = f"""
+            <h2>Bienvenido al Workspace CAA</h2>
+            <p>Tu cuenta ha sido creada exitosamente. Aquí están tus credenciales de acceso:</p>
+            <p><strong>Email:</strong> {email}</p>
+            <p><strong>Contraseña:</strong> {password}</p>
+            <p>Por favor, cambia tu contraseña después de iniciar sesión por primera vez.</p>
+            <p>¡Gracias por unirte a nosotros!</p>
+            """
+            mail.send(msg)
+            return jsonify({"msg": "Usuario Creado Correctamente y correo enviado"}), 201
+        except Exception as e:
+            # Si hay un error al enviar el correo, eliminamos el usuario creado
+            mongo.db.usuarios.delete_one({"_id": result.inserted_id})
+            return jsonify({"msg": f"Error al enviar el correo: {str(e)}"}), 500
     else:
         return jsonify({"msg": "Hubo un error, no se pudieron guardar los datos"}), 400
-        

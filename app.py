@@ -9,6 +9,7 @@ from bson import ObjectId, Binary
 from datetime import timedelta
 from bson.json_util import dumps
 from flask_cors import CORS
+from flask_mail import Mail
 import gridfs
 import base64
 
@@ -22,6 +23,7 @@ app.config.from_object(config)
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 CORS(app)
+mail = Mail(app)
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(usuario_bp)

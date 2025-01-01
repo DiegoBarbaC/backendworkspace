@@ -1,16 +1,13 @@
-from flask import Blueprint, jsonify, request, Flask
+from flask import Blueprint, jsonify, request
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required
 from model import mongo, init_db
 from config import config
-from bson.json_util import ObjectId
+from bson.json_util import ObjectId, dumps, loads
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import get_jwt_identity
-from bson import ObjectId, Binary
+from bson import ObjectId
 from datetime import timedelta
-from bson.json_util import dumps
 from flask_cors import CORS
-import gridfs
-import base64
 
 usuario_bp = Blueprint("usuario", __name__,)
 bcrypt=Bcrypt()
@@ -77,3 +74,31 @@ def get_all_users():
     user_list = dumps(all_users)
     
     return jsonify({"usuarios": user_list}), 200
+
+#Ruta para obtener un usuario
+@usuario_bp.route('/getUser/<user_id>', methods=['GET'])
+@jwt_required()
+def get_user(user_id):
+    current_user = get_jwt_identity()
+    user = mongo.db.usuarios.find_one({"_id": ObjectId(current_user)})
+    
+    if not user:
+        return jsonify({"msg": "Usuario no encontrado"}), 404
+
+    # Buscar el usuario por ID
+    retrievedUser = mongo.db.usuarios.find_one({"_id": ObjectId(user_id)})
+    
+    if not retrievedUser:
+        return jsonify({"msg": "Usuario no encontrado"}), 404
+
+    # Preparar la respuesta
+    user_data = {
+        
+        "email": retrievedUser['email'],
+        "admin": retrievedUser['admin'],
+        "editar": retrievedUser['editar'],
+        
+    }
+    
+
+    return jsonify(user_data), 200
