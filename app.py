@@ -16,7 +16,7 @@ import base64
 from rutas.auth import auth_bp
 from rutas.usuario import usuario_bp
 from rutas.secciones import secciones_bp
-
+from rutas.eventos import eventos_bp
 
 app = Flask(__name__)
 app.config.from_object(config)
@@ -28,6 +28,7 @@ mail = Mail(app)
 app.register_blueprint(auth_bp)
 app.register_blueprint(usuario_bp)
 app.register_blueprint(secciones_bp)
+app.register_blueprint(eventos_bp)
 
 #Inicializamos el acceso a MongoDB
 init_db(app)

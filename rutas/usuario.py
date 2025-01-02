@@ -5,9 +5,10 @@ from config import config
 from bson.json_util import ObjectId, dumps, loads
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import get_jwt_identity
-from bson import ObjectId
+from bson import ObjectId, Binary
 from datetime import timedelta
 from flask_cors import CORS
+import base64
 
 usuario_bp = Blueprint("usuario", __name__,)
 bcrypt=Bcrypt()
@@ -31,30 +32,41 @@ def deleteUser():
 @usuario_bp.route ('/updateUser', methods=['PUT'])
 @jwt_required()
 def updateUser():
-    data=request.get_json()
-    email=data.get('email')
-    editar=data.get('editar')
-    admin=data.get('admin')
-    password=data.get('password')
+    email = request.form.get('email')
+    editar = request.form.get('editar')
+    admin = request.form.get('admin')
+    password = request.form.get('password')
+    fechaCumple = request.form.get('fechaCumple')
+    foto = request.files.get('foto')
+    
     user = mongo.db.usuarios.find_one({"email":email})
     if (user):
-        update_data={}
+        update_data = {}
         if editar is not None:
-            update_data['editar']=bool(editar)
+            update_data['editar'] = editar.lower() == 'true'
         if admin is not None:
-            update_data['admin']=bool(admin)
+            update_data['admin'] = admin.lower() == 'true'
         if password:
             hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
-            update_data['password']=hashed_password
+            update_data['password'] = hashed_password
+        if fechaCumple:
+            update_data['fechaCumple'] = fechaCumple
+        if foto:
+            update_data['foto'] = Binary(foto.read())
+        
         if not update_data:
             return jsonify({"msg": "No se proporcionaron datos para actualizar"}), 400
-        print(update_data)
-        result=mongo.db.usuarios.update_one({"email": email}, {"$set":update_data})
-        print(result.modified_count)
+        
+        print("Datos a actualizar:", update_data)
+        result = mongo.db.usuarios.update_one({"email": email}, {"$set": update_data})
+        print("Documentos modificados:", result.modified_count)
+        
         if result.modified_count == 1:
             return jsonify({"msg": "Usuario actualizado correctamente"}), 200
         else:
             return jsonify({"msg": "Error al actualizar el usuario"}), 400
+    
+    return jsonify({"msg": "Usuario no encontrado"}), 404
 
 #Ruta para obtener todos los usuarios
 @usuario_bp.route('/getAllUsers', methods=['GET'])
@@ -90,15 +102,17 @@ def get_user(user_id):
     
     if not retrievedUser:
         return jsonify({"msg": "Usuario no encontrado"}), 404
-
+    
+        
     # Preparar la respuesta
     user_data = {
-        
         "email": retrievedUser['email'],
         "admin": retrievedUser['admin'],
         "editar": retrievedUser['editar'],
-        
-    }
     
-
+    }
+    if retrievedUser.get('foto'):
+        user_data['foto'] = base64.b64encode(retrievedUser['foto']).decode('utf-8')
+    if retrievedUser.get('fechaCumple'):
+        user_data['fechaCumple'] = retrievedUser['fechaCumple']
     return jsonify(user_data), 200
