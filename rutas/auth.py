@@ -11,9 +11,9 @@ import string
 auth_bp = Blueprint("auth", __name__,)
 bcrypt=Bcrypt()
 
-def generate_random_password(length=12):
+def generate_random_password(length=7):
     # Caracteres para la contraseña
-    characters = string.ascii_letters + string.digits + string.punctuation
+    characters = string.ascii_letters + string.digits 
     # Generar contraseña aleatoria
     password = ''.join(random.choice(characters) for i in range(length))
     return password
@@ -26,13 +26,14 @@ def login():
     print(password)
 
     user = mongo.db.usuarios.find_one({"email":email})
-    print(user['password'])
+    
 
     if user and bcrypt.check_password_hash(user['password'], password):
         expires = timedelta(days=1)
         additional_claims = {
         "admin": user.get("admin", False),
-        "editar": user.get("editar", False)   
+        "editar": user.get("editar", False),
+        #"foto": user.get("foto", None),   
     }
         access_token = create_access_token(identity=str(user["_id"]), expires_delta=expires, additional_claims=additional_claims)
         
