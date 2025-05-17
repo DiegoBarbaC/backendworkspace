@@ -21,8 +21,17 @@ def deleteUser():
     email=data.get('email')
     user = mongo.db.usuarios.find_one({"email":email})
     if (user):
-        result = mongo.db.usuarios.delete_one({"email":email})
-
+        if(user['admin']):
+            existingAdmins=mongo.db.usuarios.count_documents({"admin": True})
+            if existingAdmins == 1:
+                return jsonify({"msg": "No se puede eliminar el único administrador"}), 400
+            else:
+                result = mongo.db.usuarios.delete_one({"email":email})
+        else:
+            result = mongo.db.usuarios.delete_one({"email":email})
+    else:
+        return jsonify({"msg": "Usuario no encontrado"}), 404
+        
     if result.deleted_count == 1:
         return jsonify({"msg": "Usuario eliminado correctamente"}), 200
     else:
