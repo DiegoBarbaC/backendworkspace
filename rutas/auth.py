@@ -3,7 +3,7 @@ from flask_jwt_extended import create_access_token, jwt_required
 from model import mongo
 from flask_bcrypt import Bcrypt
 from datetime import timedelta
-from flask_mail import Mail, Message
+from flask_mail import Message
 import random
 import string
 
@@ -23,7 +23,6 @@ def login():
     data= request.get_json()
     email=data.get('email')
     password = data.get('password')
-    print(password)
 
     user = mongo.db.usuarios.find_one({"email":email})
     
@@ -32,8 +31,7 @@ def login():
         expires = timedelta(days=1)
         additional_claims = {
         "admin": user.get("admin", False),
-        "editar": user.get("editar", False),
-        #"foto": user.get("foto", None),   
+        "editar": user.get("editar", False), 
     }
         access_token = create_access_token(identity=str(user["_id"]), expires_delta=expires, additional_claims=additional_claims)
         
@@ -41,15 +39,14 @@ def login():
     else:
         return jsonify({"msg":"Credenciales incorrectas"}), 401
 
-#Ruta para registrar un nuevo usuario, se requiere jwt para crear un nuevo usuario
+
 @auth_bp.route('/register', methods=['POST'])
 @jwt_required()
 def register():
-    from app import mail  # Importamos mail aquí para evitar importación circular
+    from app import mail  
     
     data = request.get_json()
 
-    # Verificar que el correo está presente en la solicitud
     email = data.get('email')
     editar = data.get('editar', False)
     admin = data.get('admin', False)
@@ -57,17 +54,13 @@ def register():
     if not email:
         return jsonify({'message': 'Se requiere email para crear el usuario'}), 400
 
-    # Verificar si el correo ya está registrado
     if mongo.db.usuarios.find_one({'email': email}):
         return jsonify({'message': 'Este email ya tiene una cuenta creada, debe iniciar sesión'}), 400
 
-    # Generar contraseña aleatoria
     password = generate_random_password()
     
-    # Crear hash de la contraseña
     hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
 
-    # Obtener todas las secciones globales existentes para asignarlas al nuevo usuario
     secciones_globales = list(mongo.db.secciones_globales.find())
     secciones_usuario = [
         {"seccion_id": seccion['_id'], "orden": idx}
@@ -83,7 +76,6 @@ def register():
     })
     
     if result.acknowledged:
-        # Enviar correo con la contraseña
         try:
             msg = Message(
                 'Bienvenido al Workspace CAA - Tus credenciales de acceso',
@@ -100,7 +92,6 @@ def register():
             mail.send(msg)
             return jsonify({"msg": "Usuario Creado Correctamente y correo enviado"}), 201
         except Exception as e:
-            # Si hay un error al enviar el correo, eliminamos el usuario creado
             mongo.db.usuarios.delete_one({"_id": result.inserted_id})
             return jsonify({"msg": f"Error al enviar el correo: {str(e)}"}), 500
     else:

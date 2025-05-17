@@ -1,14 +1,11 @@
-from flask import Blueprint, jsonify, request, Flask
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required
-from model import mongo, init_db
-from config import config
+from flask import Blueprint, jsonify, request
+from flask_jwt_extended import jwt_required
+from model import mongo
 from bson.json_util import ObjectId
-from flask_bcrypt import Bcrypt
 from flask_jwt_extended import get_jwt_identity
-from bson import ObjectId, Binary
-from datetime import timedelta
-from bson.json_util import dumps
-from flask_cors import CORS
+from bson import ObjectId
+
+
 
 
 eventos_bp = Blueprint("eventos", __name__,)
