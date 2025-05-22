@@ -125,3 +125,24 @@ def get_user(user_id):
     if retrievedUser.get('fechaCumple'):
         user_data['fechaCumple'] = retrievedUser['fechaCumple']
     return jsonify(user_data), 200
+
+#Ruta para obtener usuarios para notas (sin restricción de admin)
+@usuario_bp.route('/getUsersForNotes', methods=['GET'])
+@jwt_required()
+def get_users_for_notes():
+    try:
+        current_user = get_jwt_identity()
+        print(f"Usuario solicitando lista: {current_user}")
+        
+        # Recupera todos los usuarios de la colección (campos básicos solamente)
+        users = list(mongo.db.usuarios.find({}, {"_id": 1, "email": 1, "nombre": 1}))
+        print(f"Usuarios encontrados: {len(users)}")
+        
+        # Transformar ObjectId a string para JSON
+        for user in users:
+            user["_id"] = str(user["_id"])
+        
+        return jsonify(users), 200
+    except Exception as e:
+        print(f"Error en getUsersForNotes: {str(e)}")
+        return jsonify({"msg": f"Error al obtener usuarios: {str(e)}"}), 500

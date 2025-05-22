@@ -40,10 +40,6 @@ app.register_blueprint(notas_bp)
 init_db(app)
 fs = gridfs.GridFS(mongo.db)
 
-#Inicializar eventos de socket para notas
-from rutas.notas import init_socket_events
-init_socket_events(socketio)
-
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)

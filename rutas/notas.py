@@ -8,45 +8,8 @@ from flask_jwt_extended import get_jwt_identity
 from bson import ObjectId, Binary
 from datetime import timedelta
 from bson.json_util import dumps
-from flask_cors import CORS
-from flask_socketio import emit, join_room, leave_room
-
 
 notas_bp = Blueprint("notas", __name__,)
-def init_socket_events(socketio):
-    # Eventos de WebSocket
-    @socketio.on('join_note')
-    def on_join_note(data):
-        note_id = data['note_id']
-        join_room(note_id)
-        emit('user_joined', {'msg': 'Usuario se unió a la nota'}, room=note_id)
-
-    @socketio.on('leave_note')
-    def on_leave_note(data):
-        note_id = data['note_id']
-        leave_room(note_id)
-        emit('user_left', {'msg': 'Usuario dejó la nota'}, room=note_id)
-
-    @socketio.on('update_note_content')
-    def handle_note_update(data):
-        try:
-            note_id = data['note_id']
-            content = data['content']
-            
-            # Actualizar en la base de datos
-            note = mongo.db.notas.find_one({"_id": ObjectId(note_id)})
-            if note:
-                mongo.db.notas.update_one(
-                {"_id": ObjectId(note_id)},
-                {"$set": {"contenido": content}}
-            )
-            # Emitir el cambio a todos los usuarios en la sala excepto el emisor
-            emit('note_updated', {
-                'content': content
-            }, room=note_id, include_self=False)
-            
-        except Exception as e:
-            emit('error', {'msg': str(e)}, room=note_id)
 
 #Ruta para obtener las notas en las que participa el usuario
 @notas_bp.route("/notes", methods=["GET"])
@@ -75,11 +38,15 @@ def create_note():
         try:
             data = request.get_json()
             titulo = data.get("titulo")
-            contenido = ""
-            usuarios=data.get("usuarios")
-            creador=user['_id']
-            mongo.db.notas.insert_one({"creador": creador, "titulo": titulo, "contenido": contenido, "usuarios": usuarios})
-            return jsonify({"msg": "Nota creada correctamente"}), 200
+            contenido = data.get("contenido", "<p><br></p>")  # Contenido inicial con formato Quill válido
+            usuarios = data.get("usuarios")
+            creador = user['_id']
+            
+            # Insertar la nota y obtener el ID
+            result = mongo.db.notas.insert_one({"creador": creador, "titulo": titulo, "contenido": contenido, "usuarios": usuarios})
+            note_id = str(result.inserted_id)
+            
+            return jsonify({"msg": "Nota creada correctamente", "id": note_id}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
@@ -104,6 +71,30 @@ def get_note(note_id):
                 return jsonify(note)
             else:
                 return jsonify({"error": "Nota no encontrada"}), 404
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+#Ruta para actualizar el contenido de una nota
+@notas_bp.route("/updateNote/<note_id>", methods=["PUT"])
+@jwt_required()
+def update_note(note_id):
+    current_user = get_jwt_identity()
+    user = mongo.db.usuarios.find_one({"_id": ObjectId(current_user)})
+    if not user:
+        return jsonify({"msg": "Usuario no encontrado"}), 404
+    else:
+        try:
+            data = request.get_json()
+            contenido = data.get("contenido")
+            
+            note = mongo.db.notas.find_one({"_id": ObjectId(note_id)})
+            if not note:
+                return jsonify({"msg": "Nota no encontrada"}), 404
+            elif current_user not in note['usuarios']:
+                return jsonify({"msg": "No tienes permiso para editar esta nota"}), 403
+            else:
+                mongo.db.notas.update_one({"_id": ObjectId(note_id)}, {"$set": {"contenido": contenido}})
+                return jsonify({"msg": "Nota actualizada correctamente"}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
