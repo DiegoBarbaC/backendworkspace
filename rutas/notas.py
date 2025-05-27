@@ -74,7 +74,7 @@ def get_note(note_id):
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
-#Ruta para actualizar el contenido de una nota
+#Ruta para actualizar una nota (contenido o título)
 @notas_bp.route("/updateNote/<note_id>", methods=["PUT"])
 @jwt_required()
 def update_note(note_id):
@@ -85,7 +85,18 @@ def update_note(note_id):
     else:
         try:
             data = request.get_json()
-            contenido = data.get("contenido")
+            update_fields = {}
+            
+            # Verificar qué campos se están actualizando
+            if "contenido" in data:
+                update_fields["contenido"] = data.get("contenido")
+            
+            if "titulo" in data:
+                update_fields["titulo"] = data.get("titulo")
+            
+            # Si no hay campos para actualizar, devolver error
+            if not update_fields:
+                return jsonify({"msg": "No se proporcionaron campos para actualizar"}), 400
             
             note = mongo.db.notas.find_one({"_id": ObjectId(note_id)})
             if not note:
@@ -93,7 +104,7 @@ def update_note(note_id):
             elif current_user not in note['usuarios']:
                 return jsonify({"msg": "No tienes permiso para editar esta nota"}), 403
             else:
-                mongo.db.notas.update_one({"_id": ObjectId(note_id)}, {"$set": {"contenido": contenido}})
+                mongo.db.notas.update_one({"_id": ObjectId(note_id)}, {"$set": update_fields})
                 return jsonify({"msg": "Nota actualizada correctamente"}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
