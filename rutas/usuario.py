@@ -146,3 +146,74 @@ def get_users_for_notes():
     except Exception as e:
         print(f"Error en getUsersForNotes: {str(e)}")
         return jsonify({"msg": f"Error al obtener usuarios: {str(e)}"}), 500
+
+#Ruta para obtener proximo cumpleaños
+@usuario_bp.route('/getBirthday', methods=['GET'])
+@jwt_required()
+def get_birthday():
+    try:
+        from datetime import datetime, timedelta
+        
+        # Obtener la fecha actual
+        today = datetime.now()
+        current_month = today.month
+        current_day = today.day
+        
+        # Buscar todos los usuarios que tienen fecha de cumpleaños
+        users = list(mongo.db.usuarios.find({"fechaCumple": {"$exists": True}}))
+        
+        if not users:
+            return jsonify({"msg": "No hay usuarios con fecha de cumpleaños registrada"}), 404
+        
+        next_birthday = None
+        next_birthday_user = None
+        days_until_next_birthday = 366  # Más de un año
+        
+        for user in users:
+            if "fechaCumple" not in user or not user["fechaCumple"]:
+                continue
+                
+            # Parsear la fecha de cumpleaños (formato esperado: YYYY-MM-DD)
+            try:
+                birthday = datetime.strptime(user["fechaCumple"], "%Y-%m-%d")
+                
+                # Crear fecha de cumpleaños para el año actual
+                birthday_this_year = datetime(today.year, birthday.month, birthday.day)
+                
+                # Si el cumpleaños ya pasó este año, considerar el del próximo año
+                if birthday_this_year < today:
+                    birthday_this_year = datetime(today.year + 1, birthday.month, birthday.day)
+                
+                # Calcular días hasta el próximo cumpleaños
+                delta = (birthday_this_year - today).days
+                
+                # Actualizar si este es el próximo cumpleaños
+                if delta < days_until_next_birthday:
+                    days_until_next_birthday = delta
+                    next_birthday = birthday_this_year
+                    next_birthday_user = user
+            except ValueError:
+                # Si el formato de fecha no es válido, ignorar este usuario
+                continue
+        
+        if next_birthday_user:
+            # Preparar respuesta con datos del usuario
+            user_data = {
+                "email": next_birthday_user.get("email", ""),
+                "nombre": next_birthday_user.get("nombre", ""),
+                "fechaCumple": next_birthday_user.get("fechaCumple", ""),
+                "proximoCumple": next_birthday.strftime("%Y-%m-%d"),
+                "diasRestantes": days_until_next_birthday
+            }
+            
+            # Agregar foto si existe
+            if next_birthday_user.get('foto'):
+                user_data['foto'] = base64.b64encode(next_birthday_user['foto']).decode('utf-8')
+                
+            return jsonify(user_data), 200
+        else:
+            return jsonify({"msg": "No se pudo determinar el próximo cumpleaños"}), 404
+            
+    except Exception as e:
+        print(f"Error en get_birthday: {str(e)}")
+        return jsonify({"msg": f"Error al obtener el próximo cumpleaños: {str(e)}"}), 500

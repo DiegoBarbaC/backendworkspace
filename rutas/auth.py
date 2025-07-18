@@ -1,11 +1,12 @@
 from flask import Blueprint, jsonify, request
-from flask_jwt_extended import create_access_token, jwt_required
+from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, get_jwt
 from model import mongo
 from flask_bcrypt import Bcrypt
 from datetime import timedelta
 from flask_mail import Message
 import random
 import string
+from bson import ObjectId
 
 
 auth_bp = Blueprint("auth", __name__,)
@@ -28,16 +29,77 @@ def login():
     
 
     if user and bcrypt.check_password_hash(user['password'], password):
-        expires = timedelta(days=1)
+        # Crear access token con duración más corta (15 minutos)
+        access_expires = timedelta(minutes=15)
+        # Crear refresh token con duración más larga (7 días)
+        refresh_expires = timedelta(days=7)
+        
         additional_claims = {
+            "admin": user.get("admin", False),
+            "editar": user.get("editar", False), 
+        }
+        
+        # Generar access token
+        access_token = create_access_token(
+            identity=str(user["_id"]), 
+            expires_delta=access_expires, 
+            additional_claims=additional_claims
+        )
+        
+        # Generar refresh token
+        refresh_token = create_refresh_token(
+            identity=str(user["_id"]),
+            expires_delta=refresh_expires
+        )
+        
+        return jsonify(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            user_id=str(user["_id"]),
+            admin=user.get("admin", False),
+            editar=user.get("editar", False)
+        ), 200
+    else:
+        return jsonify({"msg":"Credenciales incorrectas"}), 401
+
+@auth_bp.route("/refresh", methods=["POST"])
+@jwt_required(refresh=True)
+def refresh():
+    """
+    Endpoint para refrescar el access token usando el refresh token
+    """
+    # Obtener la identidad del usuario desde el refresh token
+    current_user_id = get_jwt_identity()
+    
+    # Buscar el usuario en la base de datos para obtener sus claims
+    user = mongo.db.usuarios.find_one({"_id": ObjectId(current_user_id)})
+    
+    if not user:
+        return jsonify({"msg": "Usuario no encontrado"}), 404
+    
+    # Crear un nuevo access token
+    additional_claims = {
         "admin": user.get("admin", False),
         "editar": user.get("editar", False), 
     }
-        access_token = create_access_token(identity=str(user["_id"]), expires_delta=expires, additional_claims=additional_claims)
-        
-        return jsonify(access_token=access_token),200
-    else:
-        return jsonify({"msg":"Credenciales incorrectas"}), 401
+    
+    access_token = create_access_token(
+        identity=current_user_id,
+        expires_delta=timedelta(minutes=15),
+        additional_claims=additional_claims
+    )
+    
+    return jsonify(access_token=access_token), 200
+
+@auth_bp.route('/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    """
+    Endpoint para cerrar sesión (invalidar tokens)
+    """
+    # En una implementación completa, aquí se añadiría el token a una lista negra
+    # Por ahora, solo devolvemos un mensaje de éxito
+    return jsonify({"msg": "Sesión cerrada exitosamente"}), 200
 
 
 @auth_bp.route('/register', methods=['POST'])

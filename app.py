@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Blueprint
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required
 from model import mongo, init_db
 from config import config
@@ -12,7 +12,6 @@ from flask_cors import CORS
 from flask_mail import Mail
 import gridfs
 import base64
-from flask_socketio import SocketIO
 
 
 
@@ -22,7 +21,7 @@ bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 CORS(app)
 mail = Mail(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+
 
 from rutas.auth import auth_bp
 from rutas.usuario import usuario_bp
@@ -30,11 +29,18 @@ from rutas.secciones import secciones_bp
 from rutas.eventos import eventos_bp
 from rutas.notas import notas_bp
 
-app.register_blueprint(auth_bp)
-app.register_blueprint(usuario_bp)
-app.register_blueprint(secciones_bp)
-app.register_blueprint(eventos_bp)
-app.register_blueprint(notas_bp)
+# Crear un blueprint principal para /api
+api_bp = Blueprint('api', __name__, url_prefix='/api')
+
+# Registrar los blueprints en el blueprint principal
+api_bp.register_blueprint(auth_bp)
+api_bp.register_blueprint(usuario_bp)
+api_bp.register_blueprint(secciones_bp)
+api_bp.register_blueprint(eventos_bp)
+api_bp.register_blueprint(notas_bp)
+
+# Registrar el blueprint principal en la app
+app.register_blueprint(api_bp)
 
 #Inicializamos el acceso a MongoDB
 init_db(app)
@@ -42,4 +48,5 @@ fs = gridfs.GridFS(mongo.db)
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
+    app.run(host='0.0.0.0', debug=True)
+    

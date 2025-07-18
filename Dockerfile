@@ -1,31 +1,29 @@
-# Imagen base de Python
-FROM python:3.9-slim
+# Imagen base 
+FROM --platform=linux/amd64 python:3.10.9-bullseye as base
+
+#Agregar packages requeridos
+RUN apt-get update && apt-get -y install wget curl cron vim nano iputils-ping gnupg
+
+#Instalar cliente mongo
+RUN wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | apt-key add - && \
+    echo "deb http://repo.mongodb.org/apt/debian bullseye/mongodb-org/6.0 main" | tee /etc/apt/sources.list.d/mongodb-org-6.0.list && \
+    apt-get update && \
+    apt-get install -y mongodb-org-tools mongodb-mongosh
 
 # Establecer el directorio de trabajo
 WORKDIR /app
 
-# Instalar pipenv
-RUN pip install pipenv
-
-# Copiar los archivos de dependencias
-COPY Pipfile Pipfile.lock ./
-
-# Instalar dependencias
-RUN pipenv install --system --deploy
+#Timezone
+ENV TZ='America/Mexico_City'
 
 # Copiar el resto del código
 COPY . .
 
-# Exponer el puerto que usa Flask
-EXPOSE 8000
+#Instalar dependencias
+RUN pip3 install -r requirements.txt
 
-# Establecer las variables de entorno
-ENV FLASK_APP=app.py
-ENV FLASK_ENV=production
+FROM base as production
 
-# Comando para ejecutar la aplicación
-#CMD ["gunicorn", "--bind", "0.0.0.0:8000", "app:app"]
-# Comando para ejecutar la aplicación
-CMD ["python", "-m", "flask", "run", "--host=0.0.0.0", "--port=8000"]
+
 
 
