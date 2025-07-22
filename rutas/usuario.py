@@ -84,9 +84,6 @@ def get_all_users():
     #Verifica si el usuario actual tiene permiso de admin
     current_user = get_jwt_identity()
     user = mongo.db.usuarios.find_one({"_id": ObjectId(current_user)})
-    
-    if not user or not user.get("admin", False):
-        return jsonify({"msg": "Acceso denegado: se requiere rol de administrador"}), 403
 
     # Recupera todos los usuarios de la colección
     all_users = list(mongo.db.usuarios.find({}))
