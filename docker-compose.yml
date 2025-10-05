@@ -1,6 +1,21 @@
 version: '3.9'
 
 services:
+  mongodb:
+    container_name: workspace-mongodb
+    image: mongo:6.0
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+      MONGO_INITDB_DATABASE: workspace_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - workspace-net
+
   production:
     container_name: workspace-back
     image: workspace-back
@@ -19,6 +34,12 @@ services:
       - .:/app
     networks:
       - workspace-net
+    depends_on:
+      - mongodb
+volumes:
+  mongodb_data:
+    driver: local
+
 networks:
   workspace-net:
     driver: bridge
