@@ -41,6 +41,10 @@ def addEvent():
     if not user or not (user.get("editar", False) or user.get("admin", False)):
         return jsonify({"msg": "Acceso denegado: se requiere el permiso de edición"}), 403
 
+    # Asegurarse de que el usuario actual esté incluido en la lista de usuarios
+    if current_user not in usuarios:
+        usuarios.append(current_user)
+
     # Crear el nuevo evento
     nuevo_evento = {
         "titulo": titulo,
@@ -135,6 +139,9 @@ def updateEvent(event_id):
     if fechaFin:
         update_data['fechaFin'] = fechaFin
     if usuarios:
+        # Asegurarse de que el usuario actual esté incluido en la lista de usuarios
+        if current_user not in usuarios:
+            usuarios.append(current_user)
         update_data['usuarios'] = usuarios
 
     # Actualizar el evento
