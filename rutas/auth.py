@@ -7,6 +7,7 @@ from flask_mail import Message
 import random
 import string
 from bson import ObjectId
+import re
 
 
 auth_bp = Blueprint("auth", __name__,)
@@ -103,7 +104,7 @@ def logout():
 
 
 @auth_bp.route('/register', methods=['POST'])
-@jwt_required()
+#@jwt_required()
 def register():
     from app import mail  
     
@@ -158,3 +159,68 @@ def register():
             return jsonify({"msg": f"Error al enviar el correo: {str(e)}"}), 500
     else:
         return jsonify({"msg": "Hubo un error, no se pudieron guardar los datos"}), 400
+
+
+@auth_bp.route('/forgot-password', methods=['POST'])
+def forgot_password():
+    """
+    Endpoint para recuperación de contraseña cuando el usuario la ha olvidado.
+    Recibe el email, verifica que exista, genera una nueva contraseña y la envía por correo.
+    """
+    from app import mail
+    
+    data = request.get_json()
+    email = data.get('email')
+    
+    # Validar que se proporcionó un email
+    if not email:
+        return jsonify({'message': 'Se requiere email para recuperar la contraseña'}), 400
+    
+    # Validar formato de email
+    email_pattern = re.compile(r'^[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,}$')
+    if not email_pattern.match(email):
+        return jsonify({'message': 'Formato de email inválido'}), 400
+    
+    # Buscar el usuario en la base de datos
+    user = mongo.db.usuarios.find_one({'email': email})
+    if not user:
+        # Por seguridad, no revelamos si el email existe o no
+        return jsonify({'message': 'Si el email existe en nuestra base de datos, recibirás un correo con instrucciones'}), 200
+    
+    # Generar nueva contraseña
+    new_password = generate_random_password(10)  # Contraseña más larga para mayor seguridad
+    hashed_password = bcrypt.generate_password_hash(new_password).decode('utf-8')
+    
+    # Actualizar la contraseña en la base de datos
+    result = mongo.db.usuarios.update_one(
+        {'_id': user['_id']},
+        {'$set': {'password': hashed_password}}
+    )
+    
+    if result.modified_count > 0:
+        try:
+            # Enviar email con la nueva contraseña
+            msg = Message(
+                'Recuperación de Contraseña - Workspace CAA',
+                recipients=[email]
+            )
+            msg.html = f"""
+            <h2>Recuperación de Contraseña - Workspace CAA</h2>
+            <p>Has solicitado restablecer tu contraseña. Aquí está tu nueva contraseña temporal:</p>
+            <p><strong>Email:</strong> {email}</p>
+            <p><strong>Nueva Contraseña:</strong> {new_password}</p>
+            <p>Por favor, cambia esta contraseña después de iniciar sesión por motivos de seguridad.</p>
+            <p>Si no solicitaste este cambio, por favor contacta al administrador inmediatamente.</p>
+            <p>¡Gracias!</p>
+            """
+            mail.send(msg)
+            return jsonify({'message': 'Se ha enviado un correo con tu nueva contraseña'}), 200
+        except Exception as e:
+            # Si falla el envío del correo, revertimos el cambio de contraseña
+            mongo.db.usuarios.update_one(
+                {'_id': user['_id']},
+                {'$set': {'password': user['password']}}
+            )
+            return jsonify({'message': f'Error al enviar el correo: {str(e)}'}), 500
+    else:
+        return jsonify({'message': 'No se pudo actualizar la contraseña'}), 500
