@@ -4,11 +4,33 @@ from model import mongo
 from bson.json_util import ObjectId
 from flask_jwt_extended import get_jwt_identity
 from bson import ObjectId
+from datetime import datetime
 
 
 
 
 eventos_bp = Blueprint("eventos", __name__,)
+
+
+def parse_event_datetime(value):
+    if not value:
+        return None
+    normalized_value = value.strip()
+    if normalized_value.endswith('Z'):
+        normalized_value = f"{normalized_value[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(normalized_value)
+        if parsed.tzinfo:
+            return parsed.astimezone().replace(tzinfo=None)
+        return parsed
+    except ValueError:
+        pass
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(normalized_value, fmt)
+        except ValueError:
+            continue
+    return None
 
 #Ruta para agregar un nuevo evento
 @eventos_bp.route('/addEvent', methods=['POST'])
@@ -32,6 +54,16 @@ def addEvent():
         return jsonify({'message': 'Se requiere una fecha de fin para crear el evento'}), 400
     if not usuarios:
         return jsonify({'message': 'Se requiere agregar al menos un usuario para crear el evento'}), 400
+
+    fecha_inicio_dt = parse_event_datetime(fechaInicio)
+    fecha_fin_dt = parse_event_datetime(fechaFin)
+    now = datetime.now()
+    if not fecha_inicio_dt or not fecha_fin_dt:
+        return jsonify({'message': 'Formato de fecha inválido'}), 400
+    if fecha_inicio_dt < now:
+        return jsonify({'message': 'La fecha de inicio no puede estar en el pasado'}), 400
+    if fecha_fin_dt < fecha_inicio_dt:
+        return jsonify({'message': 'La fecha de fin debe ser posterior a la fecha de inicio'}), 400
 
     # Obtener el usuario actual
     current_user = get_jwt_identity()
@@ -127,6 +159,24 @@ def updateEvent(event_id):
     fechaInicio = data.get('fechaInicio')
     fechaFin = data.get('fechaFin')
     usuarios = request.form.getlist('usuarios')
+
+    evento_existente = mongo.db.eventos.find_one({"_id": ObjectId(event_id)})
+    if not evento_existente:
+        return jsonify({"msg": "Evento no encontrado"}), 404
+
+    final_fecha_inicio = fechaInicio if fechaInicio else evento_existente.get('fechaInicio')
+    final_fecha_fin = fechaFin if fechaFin else evento_existente.get('fechaFin')
+
+    final_fecha_inicio_dt = parse_event_datetime(final_fecha_inicio)
+    final_fecha_fin_dt = parse_event_datetime(final_fecha_fin)
+    now = datetime.now()
+
+    if not final_fecha_inicio_dt or not final_fecha_fin_dt:
+        return jsonify({'message': 'Formato de fecha inválido'}), 400
+    if final_fecha_inicio_dt < now:
+        return jsonify({'message': 'La fecha de inicio no puede estar en el pasado'}), 400
+    if final_fecha_fin_dt < final_fecha_inicio_dt:
+        return jsonify({'message': 'La fecha de fin debe ser posterior a la fecha de inicio'}), 400
 
     # Construir un diccionario solo con los campos a actualizar
     update_data = {}
