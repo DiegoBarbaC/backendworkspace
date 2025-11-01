@@ -1,16 +1,12 @@
 from flask import Blueprint, jsonify, request
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from model import mongo
 from bson.json_util import ObjectId
-from flask_jwt_extended import get_jwt_identity
-from bson import ObjectId
 from datetime import datetime, timedelta
+import pytz
 
-
-
-
-eventos_bp = Blueprint("eventos", __name__,)
-
+# Zona horaria de México (UTC-6, asumiendo estándar, ajustar si es necesario)
+MEXICO_TZ = pytz.timezone('America/Mexico_City')
 
 def parse_event_datetime(value):
     if not value:
@@ -20,14 +16,22 @@ def parse_event_datetime(value):
         normalized_value = f"{normalized_value[:-1]}+00:00"
     try:
         parsed = datetime.fromisoformat(normalized_value)
-        if parsed.tzinfo:
-            return parsed.astimezone().replace(tzinfo=None)
+        if parsed.tzinfo is None:
+            # Asumir que es en zona de México si no tiene tzinfo
+            parsed = MEXICO_TZ.localize(parsed)
+        # Convertir a UTC para consistencia
+        parsed = parsed.astimezone(pytz.utc).replace(tzinfo=None)
         return parsed
     except ValueError:
         pass
     for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
         try:
-            return datetime.strptime(normalized_value, fmt)
+            parsed = datetime.strptime(normalized_value, fmt)
+            # Asumir zona de México
+            parsed = MEXICO_TZ.localize(parsed)
+            # Convertir a UTC
+            parsed = parsed.astimezone(pytz.utc).replace(tzinfo=None)
+            return parsed
         except ValueError:
             continue
     return None
@@ -55,7 +59,7 @@ def addEvent():
 
     fecha_inicio_dt = parse_event_datetime(fechaInicio)
     fecha_fin_dt = parse_event_datetime(fechaFin)
-    now = datetime.now().replace(second=0, microsecond=0)  # Redondear al minuto actual
+    now = datetime.utcnow().replace(second=0, microsecond=0)  # UTC para consistencia
     if not fecha_inicio_dt or not fecha_fin_dt:
         return jsonify({'message': 'Formato de fecha inválido'}), 400
     
@@ -63,7 +67,7 @@ def addEvent():
         return jsonify({'message': 'La fecha de fin debe ser posterior a la fecha de inicio'}), 400
     
     # Restar 5 minutos a la fecha de inicio para dar margen
-    fecha_inicio_dt += timedelta(minutes=5)
+    fecha_inicio_dt -= timedelta(minutes=5)
     
     if fecha_inicio_dt < now:
         return jsonify({'message': 'La fecha de inicio no puede estar en el pasado'}), 400
@@ -172,7 +176,7 @@ def updateEvent(event_id):
 
     final_fecha_inicio_dt = parse_event_datetime(final_fecha_inicio)
     final_fecha_fin_dt = parse_event_datetime(final_fecha_fin)
-    now = datetime.now().replace(second=0, microsecond=0)
+    now = datetime.utcnow().replace(second=0, microsecond=0)  # UTC para consistencia
     if not final_fecha_inicio_dt or not final_fecha_fin_dt:
         return jsonify({'message': 'Formato de fecha inválido'}), 400
     
