@@ -4,7 +4,7 @@ from model import mongo
 from bson.json_util import ObjectId
 from flask_jwt_extended import get_jwt_identity
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 
@@ -52,18 +52,21 @@ def addEvent():
         return jsonify({'message': 'Se requiere una fecha de inicio para crear el evento'}), 400
     if not fechaFin:
         return jsonify({'message': 'Se requiere una fecha de fin para crear el evento'}), 400
-    if not usuarios:
-        return jsonify({'message': 'Se requiere agregar al menos un usuario para crear el evento'}), 400
 
     fecha_inicio_dt = parse_event_datetime(fechaInicio)
     fecha_fin_dt = parse_event_datetime(fechaFin)
-    now = datetime.now()
+    now = datetime.now().replace(second=0, microsecond=0)  # Redondear al minuto actual
     if not fecha_inicio_dt or not fecha_fin_dt:
         return jsonify({'message': 'Formato de fecha inválido'}), 400
-    if fecha_inicio_dt < now:
-        return jsonify({'message': 'La fecha de inicio no puede estar en el pasado'}), 400
+    
     if fecha_fin_dt < fecha_inicio_dt:
         return jsonify({'message': 'La fecha de fin debe ser posterior a la fecha de inicio'}), 400
+    
+    # Restar 5 minutos a la fecha de inicio para dar margen
+    fecha_inicio_dt += timedelta(minutes=5)
+    
+    if fecha_inicio_dt < now:
+        return jsonify({'message': 'La fecha de inicio no puede estar en el pasado'}), 400
 
     # Obtener el usuario actual
     current_user = get_jwt_identity()
@@ -74,11 +77,8 @@ def addEvent():
         return jsonify({"msg": "Acceso denegado: se requiere el permiso de edición"}), 403
 
     # Asegurarse de que el usuario actual esté incluido en la lista de usuarios
-    print(f"current_user: '{current_user}' (tipo: {type(current_user)})")
-    print(f"usuarios antes: {usuarios}")
     if current_user not in usuarios:
         usuarios.append(current_user)
-        print(f"Usuario agregado. usuarios después: {usuarios}")
 
     # Crear el nuevo evento
     nuevo_evento = {
@@ -172,14 +172,18 @@ def updateEvent(event_id):
 
     final_fecha_inicio_dt = parse_event_datetime(final_fecha_inicio)
     final_fecha_fin_dt = parse_event_datetime(final_fecha_fin)
-    now = datetime.now()
-
+    now = datetime.now().replace(second=0, microsecond=0)
     if not final_fecha_inicio_dt or not final_fecha_fin_dt:
         return jsonify({'message': 'Formato de fecha inválido'}), 400
-    if final_fecha_inicio_dt < now:
-        return jsonify({'message': 'La fecha de inicio no puede estar en el pasado'}), 400
+    
     if final_fecha_fin_dt < final_fecha_inicio_dt:
         return jsonify({'message': 'La fecha de fin debe ser posterior a la fecha de inicio'}), 400
+    
+    # Restar 5 minutos a la fecha de inicio para dar margen
+    final_fecha_inicio_dt -= timedelta(minutes=5)
+    
+    if final_fecha_inicio_dt < now:
+        return jsonify({'message': 'La fecha de inicio no puede estar en el pasado'}), 400
 
     # Construir un diccionario solo con los campos a actualizar
     update_data = {}
