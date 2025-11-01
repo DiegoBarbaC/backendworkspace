@@ -8,6 +8,11 @@ import pytz
 # Zona horaria de México (UTC-6, asumiendo estándar, ajustar si es necesario)
 MEXICO_TZ = pytz.timezone('America/Mexico_City')
 
+
+
+eventos_bp = Blueprint("eventos", __name__,)
+
+
 def parse_event_datetime(value):
     if not value:
         return None
