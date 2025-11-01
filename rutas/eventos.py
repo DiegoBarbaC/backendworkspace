@@ -67,7 +67,7 @@ def addEvent():
         return jsonify({'message': 'La fecha de fin debe ser posterior a la fecha de inicio'}), 400
     
     # Restar 5 minutos a la fecha de inicio para dar margen
-    fecha_inicio_dt -= timedelta(minutes=5)
+    fecha_inicio_dt += timedelta(minutes=5)
     
     if fecha_inicio_dt < now:
         return jsonify({'message': 'La fecha de inicio no puede estar en el pasado'}), 400
