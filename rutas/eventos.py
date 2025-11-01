@@ -74,8 +74,11 @@ def addEvent():
         return jsonify({"msg": "Acceso denegado: se requiere el permiso de edición"}), 403
 
     # Asegurarse de que el usuario actual esté incluido en la lista de usuarios
+    print(f"current_user: '{current_user}' (tipo: {type(current_user)})")
+    print(f"usuarios antes: {usuarios}")
     if current_user not in usuarios:
         usuarios.append(current_user)
+        print(f"Usuario agregado. usuarios después: {usuarios}")
 
     # Crear el nuevo evento
     nuevo_evento = {
